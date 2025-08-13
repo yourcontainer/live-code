@@ -3,6 +3,8 @@ Live Coding
 
 React + TypeScript app that animates code typing with syntax highlighting.
 
+**Demo: https://yourcontainer.github.io/live-code/**
+
 Features
 --------
 
