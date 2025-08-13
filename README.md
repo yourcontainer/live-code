@@ -1,3 +1,5 @@
+![Demo GIF](https://raw.githubusercontent.com/yourcontainer/live-code/refs/heads/main/public/assets/video.gif)
+
 Live Coding
 ===========
 
