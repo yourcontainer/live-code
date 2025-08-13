@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ASMR Coding Editor</title>
+
+<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+
+<style>
+  :root {
+    --bg: #1e1e1e;
+    --header-h: 36px;
+  }
+  html, body {
+    height: 100%;
+    margin: 0;
+    background: var(--bg);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  .editor {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    padding: 20px;
+    box-sizing: border-box;
+  }
+  .editor-header {
+    height: var(--header-h);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+    background: #2b2b2b;
+    border-bottom: 1px solid #1f1f1f;
+    flex-shrink: 0;
+    border-radius: 6px 6px 0 0;
+  }
+  .window-controls { display: flex; gap: 8px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot.red { background: #ff5f56; }
+  .dot.yellow { background: #ffbd2e; }
+  .dot.green { background: #27c93f; }
+  .editor-title {
+    margin: 0 auto;
+    font-size: 14px;
+    color: #c8c8c8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .editor-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    border-radius: 0 0 6px 6px;
+    overflow: hidden;
+  }
+  .scroll-container {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    background: var(--bg);
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scroll-container::-webkit-scrollbar { width: 0; height: 0; }
+  .code-wrapper {
+    display: flex;
+    align-items: stretch;
+    min-height: 100%;
+  }
+  .line-numbers {
+    background: #252526;
+    color: #858585;
+    padding: 12px 6px;
+    text-align: right;
+    user-select: none;
+    flex-shrink: 0;
+    height: 100%;
+  }
+  .line-numbers div {
+    height: 1.5em;
+    width: 2em;
+  }
+  pre[class*="language-"] {
+    margin: 0;
+    padding: 8px 12px;
+    line-height: 1.5;
+    tab-size: 2;
+    -moz-tab-size: 2;
+    background: var(--bg);
+  }
+  pre[class*="language-"] > code {
+    display: block;
+    position: relative;
+  }
+  pre[class*="language-"] > code::after {
+    content: "";
+    display: inline-block;
+    width: 8px;
+    height: 1em;
+    margin-left: 2px;
+    background: #fff;
+    vertical-align: -0.2em;
+    animation: blink 1s steps(1, end) infinite;
+  }
+  @keyframes blink {
+    0%, 50% { opacity: 1; }
+    50.1%, 100% { opacity: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="editor">
+  <div class="editor-header">
+    <div class="window-controls">
+      <span class="dot red"></span>
+      <span class="dot yellow"></span>
+      <span class="dot green"></span>
+    </div>
+    <div class="editor-title">/home/user/kernel.c</div>
+  </div>
+
+  <div class="editor-body">
+    <div class="scroll-container" id="scroll">
+      <div class="code-wrapper">
+        <div class="line-numbers" id="lineNumbers"><div>1</div></div>
+        <pre><code id="code" class="language-c"></code></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+<script>
+  const rawText = `static int copy_strings(int argc, struct user_arg_ptr argv,
+			struct linux_binprm *bprm)
+{
+	struct page *kmapped_page = NULL;
+	char *kaddr = NULL;
+	unsigned long kpos = 0;
+	int ret;
+
+	while (argc-- > 0) {
+		const char __user *str;
+		int len;
+		unsigned long pos;
+
+		ret = -EFAULT;
+		str = get_user_arg_ptr(argv, argc);
+		if (IS_ERR(str))
+			goto out;
+
+		len = strnlen_user(str, MAX_ARG_STRLEN);
+		if (!len)
+			goto out;
+
+		ret = -E2BIG;
+		if (!valid_arg_len(bprm, len))
+			goto out;
+
+		/* We're going to work our way backwards. */
+		pos = bprm->p;
+		str += len;
+		bprm->p -= len;
+		if (bprm_hit_stack_limit(bprm))
+			goto out;
+
+		while (len > 0) {
+			int offset, bytes_to_copy;
+
+			if (fatal_signal_pending(current)) {
+				ret = -ERESTARTNOHAND;
+				goto out;
+			}
+			cond_resched();
+
+			offset = pos % PAGE_SIZE;
+			if (offset == 0)
+				offset = PAGE_SIZE;
+
+			bytes_to_copy = offset;
+			if (bytes_to_copy > len)
+				bytes_to_copy = len;
+
+			offset -= bytes_to_copy;
+			pos -= bytes_to_copy;
+			str -= bytes_to_copy;
+			len -= bytes_to_copy;
+
+			if (!kmapped_page || kpos != (pos & PAGE_MASK)) {
+				struct page *page;
+
+				page = get_arg_page(bprm, pos, 1);
+				if (!page) {
+					ret = -E2BIG;
+					goto out;
+				}
+
+				if (kmapped_page) {
+					flush_dcache_page(kmapped_page);
+					kunmap_local(kaddr);
+					put_arg_page(kmapped_page);
+				}
+				kmapped_page = page;
+				kaddr = kmap_local_page(kmapped_page);
+				kpos = pos & PAGE_MASK;
+				flush_arg_page(bprm, kpos, kmapped_page);
+			}
+			if (copy_from_user(kaddr+offset, str, bytes_to_copy)) {
+				ret = -EFAULT;
+				goto out;
+			}
+		}
+	}
+	ret = 0;
+out:
+	if (kmapped_page) {
+		flush_dcache_page(kmapped_page);
+		kunmap_local(kaddr);
+		put_arg_page(kmapped_page);
+	}
+	return ret;
+}
+`;
+
+  const text = rawText.replace(/^\n+/, "");
+  const codeEl = document.getElementById("code");
+  const scrollEl = document.getElementById("scroll");
+  const lineNumbersEl = document.getElementById("lineNumbers");
+
+  let i = 0;
+  let currentLines = 1;
+
+  function updateLineNumbers() {
+    const lines = codeEl.textContent.split("\n").length;
+    if (lines !== currentLines) {
+      currentLines = lines;
+      lineNumbersEl.innerHTML = "";
+      for (let n = 1; n <= currentLines; n++) {
+        const div = document.createElement("div");
+        div.textContent = n;
+        lineNumbersEl.appendChild(div);
+      }
+    }
+  }
+
+  function typeTick() {
+    if (i < text.length) {
+      codeEl.textContent += text[i];
+      i++;
+
+      Prism.highlightElement(codeEl);
+      updateLineNumbers();
+
+      scrollEl.scrollTop = scrollEl.scrollHeight;
+      const delay = text[i - 1] === "\n" ? 15 : 15 + Math.random() * 10;
+      setTimeout(typeTick, delay);
+    } else {
+      Prism.highlightElement(codeEl);
+      updateLineNumbers();
+    }
+  }
+
+  Prism.highlightElement(codeEl);
+  updateLineNumbers();
+  typeTick();
+</script>
+</body>
+</html>
