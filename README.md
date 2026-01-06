@@ -7,6 +7,14 @@ React + TypeScript app that animates code typing with syntax highlighting.
 
 **Demo: https://yourcontainer.github.io/live-code/**
 
+**Update: 6/1/2026**
+
+
+Added code screenshot editor that can be embeded to your website/video etc.
+
+
+![Editor](https://raw.githubusercontent.com/yourcontainer/live-code/refs/heads/main/public/assets/editor.png)
+
 Features
 --------
 
